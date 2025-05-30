@@ -1,0 +1,91 @@
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/dotNET.gitlab-ci.yml
+
+# The following script will work for any project that can be built from command line by msbuild
+# It uses powershell shell executor, so you need to add the following line to your config.toml file
+# (located in gitlab-runner.exe directory):
+#   shell = "powershell"
+#
+# The script is composed of 3 stages: build, test and deploy.
+#
+# The build stage restores NuGet packages and uses msbuild to build the exe and msi
+# One major issue you'll find is that you can't build msi projects from command line
+# if you use vdproj.  There are workarounds building msi via devenv, but they rarely work
+# The best solution is migrating your vdproj projects to WiX, as it can be build directly
+# by msbuild.
+#
+# The test stage runs nunit from command line against Test project inside your solution
+# It also saves the resulting TestResult.xml file
+#
+# The deploy stage copies the exe and msi from build stage to a network drive
+# You need to have the network drive mapped as Local System user for gitlab-runner service to see it
+# The best way to persist the mapping is via a scheduled task
+# running the following batch command: net use P: \\x.x.x.x\Projects /u:your_user your_pass /persistent:yes
+#
+# You can copy and paste this template into a new `.gitlab-ci.yml` file.
+# You should not add this template to an existing `.gitlab-ci.yml` file by using the `include:` keyword.
+
+# place project specific paths in variables to make the rest of the script more generic
+variables:
+  EXE_RELEASE_FOLDER: 'Run'
+  DEPLOY_FOLDER: 'C:\Products\Output'
+  NUGET_PATH: 'C:\NuGet\nuget.exe'
+  MSBUILD_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\msbuild.exe'
+  INNO_SETUP_PROGRAM_PATH: 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+  INNO_SETUP_ISS_PATH: 'C:\Program Files (x86)\Inno Setup 6\zsy.iss'
+
+stages:
+  - build
+  - deploy
+
+cache:
+   key: "$CI_COMMIT_SHA"
+   paths:
+     - "Run/"
+
+build_job:
+  stage: build
+  only:
+    - web
+  script:
+    - '& "$env:NUGET_PATH" restore'  # restore Nuget dependencies
+    - '& "$env:MSBUILD_PATH" /p:Configuration=Release'  # build the project
+    - 'rm Run\*.pdb' # remove pdb file
+    - 'rm Run\*\*.pdb'
+
+deploy_job:
+  stage: deploy
+  only:
+    - web
+  script:
+    - 'New-Item -ItemType Directory -Force -Path "C:\Products\Artifacts"'
+    - 'Remove-Item -Recurse -Path C:\Products\Artifacts\*'
+    - 'xcopy /y /S /E "Run\" "C:\Products\Artifacts\SW\"'
+    # copy plugins
+    - 'xcopy /y "C:\Products\Artifacts\SW\LightSource\" "C:\Products\Artifacts\plugin\LightSource\"'
+    - 'xcopy /y "C:\Products\Artifacts\SW\AOI\" "C:\Products\Artifacts\plugin\AOI\"'
+    - 'xcopy /y /S /E "C:\Products\Artifacts\SW\Camera\" "C:\Products\Artifacts\plugin\Camera\"'
+    - 'xcopy /y "C:\Products\Artifacts\SW\Comm\" "C:\Products\Artifacts\plugin\Comm\"'
+    - 'xcopy /y "C:\Products\Artifacts\SW\Project\" "C:\Products\Artifacts\plugin\Project\" '
+    # copy attachedProducts
+    - 'xcopy /y /S /E "C:\Products\AttachedProducts\*" "C:\Products\Artifacts\"' 
+    # remove plugins in sw
+    - 'Remove-Item -Recurse -Path "C:\Products\Artifacts\SW\LightSource\*","C:\Products\Artifacts\SW\AOI\*","C:\Products\Artifacts\SW\Camera\*","C:\Products\Artifacts\SW\Comm\*","C:\Products\Artifacts\SW\Project\*"'
+    # copy attached tools
+    - 'xcopy /y /S /E "C:\Products\AttachedTools\*" "C:\Products\Artifacts\SW\"'
+    # create inno setup
+    - '& $INNO_SETUP_PROGRAM_PATH $INNO_SETUP_ISS_PATH' 
+    - 'Remove-Item -Recurse -Path C:\Products\Artifacts\SW'
+    # get current date
+    - '$currentDate = Get-Date -Format "yyyy-MM-dd"'
+    # zip all files
+    - '$zippedFileName = "C:\Products\Artifacts\" + "视觉检测软件-" + "$currentDate" + ".zip"'
+    - 'Compress-Archive -Path C:\Products\Artifacts\* -DestinationPath "$zippedFileName"'
+    # copy zipped file to deploy folder
+    - '$deployFolder = $($env:DEPLOY_FOLDER) + "\"'
+    - 'xcopy /y "$zippedFileName" "$deployFolder"'
+  dependencies:
+    - build_job
+  environment: production
