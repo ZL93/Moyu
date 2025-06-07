@@ -35,7 +35,7 @@ namespace Moyu
                 {
                     _pageSize = Console.WindowHeight - 3;
                 }
-                Console.Clear();
+                ConsoleHelper.ClearAll(); // 清空控制台缓冲区
                 if (bossKeyDown)
                 {
                     Console.WriteLine("正在更新中，请稍候...");
@@ -102,7 +102,7 @@ namespace Moyu
                 switch (key.Key)
                 {
                     case ConsoleKey.Escape:
-                        Console.Clear();
+                        ConsoleHelper.ClearAll(); // 清空控制台缓冲区
                         return;
 
                     case ConsoleKey.RightArrow:
@@ -285,7 +285,7 @@ namespace Moyu
 
         private static void ReadBook(BookInfo book)
         {
-            Console.Clear();
+            ConsoleHelper.ClearAll(); // 清空控制台缓冲区
             Console.WriteLine("加载中，请稍候...");
             bookService.ReadBook(book);
             bool exit = false;

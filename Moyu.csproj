@@ -51,6 +51,7 @@
     <Compile Include="Models\BookInfo.cs" />
     <Compile Include="Models\ChapterInfo.cs" />
     <Compile Include="Services\BookService.cs" />
+    <Compile Include="Utils\ConsoleHelper.cs" />
     <Compile Include="Utils\SysEnvironment.cs" />
     <Compile Include="Utils\TextFileReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
