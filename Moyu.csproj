@@ -55,6 +55,10 @@
     <Compile Include="Models\BookInfo.cs" />
     <Compile Include="Models\ChapterInfo.cs" />
     <Compile Include="Services\BookService.cs" />
+    <Compile Include="Services\EpubBookService.cs" />
+    <Compile Include="Services\IBookService.cs" />
+    <Compile Include="Services\TxtBookService.cs" />
+    <Compile Include="UI\ConsoleUI.cs" />
     <Compile Include="Utils\ConsoleHelper.cs" />
     <Compile Include="Utils\SysEnvironment.cs" />
     <Compile Include="Utils\TextFileReader.cs" />

@@ -110,6 +110,78 @@ namespace Moyu.Utils
 
             return false;
         }
+
+        public static int GetCharDisplayWidth(char c)
+        {
+            if (char.IsControl(c))
+            {
+                return 0;
+            }
+
+            if (c == '\t')
+            {
+                return 4;
+            }
+
+            var code = (int)c;
+            if ((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0xFF00 && code <= 0xFFEF) || (code >= 0x3000 && code <= 0x303F))
+            {
+                return 2;
+            }
+
+            return 1;
+        }
+
+        /// <summary>
+        /// 截断中文书名（按显示宽度）
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="maxDisplayWidth"></param>
+        /// <returns></returns>
+        public static string Truncate(string text, int maxDisplayWidth)
+        {
+            int width = 0;
+            var sb = new StringBuilder();
+            foreach (var ch in text)
+            {
+                int w = GetCharDisplayWidth(ch);
+                if (width + w > maxDisplayWidth)
+                {
+                    sb.Append("…");
+                    break;
+                }
+                sb.Append(ch);
+                width += w;
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 补足显示宽度到指定宽度
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="totalDisplayWidth"></param>
+        /// <returns></returns>
+        public static string PadRightDisplay(string text, int totalDisplayWidth)
+        {
+            int currentWidth = GetDisplayWidth(text);
+            return text + new string(' ', Math.Max(0, totalDisplayWidth - currentWidth));
+        }
+
+        /// <summary>
+        /// 获取字符串显示宽度
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        public static int GetDisplayWidth(string text)
+        {
+            int width = 0;
+            foreach (var ch in text)
+            {
+                width += GetCharDisplayWidth(ch);
+            }
+            return width;
+        }
     }
 
 

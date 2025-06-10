@@ -13,6 +13,9 @@
         /// 章节所在行数
         /// </summary>
         public int LineIndex { get; set; } = 0;
-        
+        /// <summary>
+        /// 章节索引
+        /// </summary>
+        public int ChapterIndex { get; set; } = 0;
     }
 }
