@@ -13,5 +13,6 @@
         /// 章节所在行数
         /// </summary>
         public int LineIndex { get; set; } = 0;
+        
     }
 }

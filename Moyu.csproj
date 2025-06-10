@@ -44,9 +44,13 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="VersOne.Epub, Version=3.3.4.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\VersOne.Epub.3.3.4\lib\net46\VersOne.Epub.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Config.cs" />
+    <Compile Include="Models\BookFormatEnum.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Models\BookInfo.cs" />
     <Compile Include="Models\ChapterInfo.cs" />

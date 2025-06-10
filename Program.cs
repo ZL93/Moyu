@@ -54,7 +54,7 @@ namespace Moyu
                     {
                         int indexInPage = i - start;
                         var book = books[i];
-                        string nameStr = PadRightDisplay(Truncate(book.BookName, 24), 28); // 显示宽度补齐到28
+                       
                         string progressStr = book.BookMarkProgress.ToString("P0").PadRight(6);
                         string dateStr = book.LastReadTime.ToString("yy/MM/dd");
 
@@ -65,13 +65,16 @@ namespace Moyu
                             Console.ForegroundColor = ConsoleColor.DarkYellow;
                             prefix = ">>"; // 高亮当前选中项
                         }
+
+                        string titleStr = $"{prefix} {indexStr} {Truncate(book.BookName, 30)}";
+                        string padStr = PadRightDisplay(titleStr, 40);
                         if (book.LastReadTime == DateTime.MinValue)
                         {
-                            Console.WriteLine($"{prefix} {indexStr} {nameStr} 未读");
+                            Console.WriteLine($"{padStr} 未读");
                         }
                         else
                         {
-                            Console.WriteLine($"{prefix} {indexStr} {nameStr} 进度:{progressStr} {dateStr}");
+                            Console.WriteLine($"{padStr} 进度:{progressStr} {dateStr}");
                         }
                         Console.ForegroundColor = ConsoleColor.DarkGray;
                     }
