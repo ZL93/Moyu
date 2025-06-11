@@ -413,7 +413,7 @@ namespace Moyu.UI
                         int globalIndex = chapterPage * pageSize + selectedIndexInPage;
                         if (globalIndex < chapterCount)
                         {
-                            bookService.JumpToChapter(globalIndex);
+                            bookService.JumpToLineInChapter(globalIndex, 0);
                             return;
                         }
                         break;
@@ -426,7 +426,7 @@ namespace Moyu.UI
                             int gIndex = chapterPage * pageSize + selIndex;
                             if (selIndex >= 0 && gIndex < chapterCount)
                             {
-                                bookService.JumpToChapter(gIndex);
+                                bookService.JumpToLineInChapter(gIndex, 0);
                                 return;
                             }
                         }

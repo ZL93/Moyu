@@ -77,16 +77,6 @@ namespace Moyu.Services
             DetectChapters();
         }
 
-        public void JumpToChapter(int chapterIndex)
-        {
-            if (chapterIndex < 0 || chapterIndex >= _chapters.Count)
-            {
-                return;
-            }
-
-            JumpToLine(_chapters[chapterIndex].LineIndex);
-        }
-
         public void JumpToLineInChapter(int chapterIndex, int lineOffset)
         {
             if (chapterIndex < 0 || chapterIndex >= _chapters.Count)

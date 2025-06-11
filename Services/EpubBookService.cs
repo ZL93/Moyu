@@ -54,13 +54,6 @@ namespace Moyu.Services
             return chapterList.Skip(start).Take(end - start).ToList();
         }
 
-        public void JumpToChapter(int chapterIndex) 
-        { 
-            currentBook.CurrentChapterIndex = chapterIndex;
-            currentBook.CurrentReadChapterLine = 0;
-
-            currentBook.MarkProgress = (float)currentBook.CurrentChapterIndex / chapterList.Count;
-        }
         public void JumpToLineInChapter(int chapterIndex, int lineOffset)
         {
             currentBook.CurrentChapterIndex = chapterIndex;

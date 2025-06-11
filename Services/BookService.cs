@@ -23,8 +23,6 @@ namespace Moyu.Services
             }
             _innerService.LoadBook(book);
         }
-
-        public void JumpToChapter(int chapterIndex) => _innerService.JumpToChapter(chapterIndex);
         public void JumpToLineInChapter(int chapterIndex, int lineOffset) => _innerService.JumpToLineInChapter(chapterIndex, lineOffset);
         public BookInfo GetBookInfo(string filePath)
         {
