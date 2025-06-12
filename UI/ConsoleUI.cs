@@ -335,14 +335,15 @@ namespace Moyu.UI
             }
 
             int pageSize = Config.Instance.ShowHelpInfo ? Console.WindowHeight - 8 : Console.WindowHeight - 1;
+            int totalChapterPages = (chapterCount + pageSize - 1) / pageSize;
 
             int currentChapterIndex = book.CurrentChapterIndex;
-            int chapterPage = currentChapterIndex / pageSize;
-            int selectedIndexInPage = currentChapterIndex % pageSize;
-            int totalChapterPages = (chapterCount + pageSize - 1) / pageSize;
 
             while (true)
             {
+                int chapterPage = currentChapterIndex / pageSize;
+                int selectedIndexInPage = currentChapterIndex % pageSize;
+
                 Console.Clear();
                 if (Config.Instance.ShowHelpInfo)
                 {
@@ -355,7 +356,8 @@ namespace Moyu.UI
 
                 for (int i = 0; i < chapters.Count; i++)
                 {
-                    if (i == selectedIndexInPage)
+                    int globalIndex = start + i;
+                    if (globalIndex == currentChapterIndex)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
                         Console.WriteLine($">>[{i + 1}] {chapters[i].Title}");
@@ -379,44 +381,27 @@ namespace Moyu.UI
                 {
                     case ConsoleKey.UpArrow:
                     case ConsoleKey.W:
-                        if (selectedIndexInPage > 0)
-                        {
-                            selectedIndexInPage--;
-                        }
-
+                        if (currentChapterIndex > 0)
+                            currentChapterIndex--;
                         break;
                     case ConsoleKey.DownArrow:
                     case ConsoleKey.S:
-                        if (selectedIndexInPage < chapters.Count - 1)
-                        {
-                            selectedIndexInPage++;
-                        }
-
+                        if (currentChapterIndex < chapterCount - 1)
+                            currentChapterIndex++;
                         break;
                     case ConsoleKey.LeftArrow:
                     case ConsoleKey.A:
                         if (chapterPage > 0)
-                        {
-                            chapterPage--;
-                            selectedIndexInPage = 0;
-                        }
+                            currentChapterIndex = Math.Max(0, currentChapterIndex - pageSize);
                         break;
                     case ConsoleKey.RightArrow:
                     case ConsoleKey.D:
                         if ((chapterPage + 1) * pageSize < chapterCount)
-                        {
-                            chapterPage++;
-                            selectedIndexInPage = 0;
-                        }
+                            currentChapterIndex = Math.Min(chapterCount - 1, currentChapterIndex + pageSize);
                         break;
                     case ConsoleKey.Enter:
-                        int globalIndex = chapterPage * pageSize + selectedIndexInPage;
-                        if (globalIndex < chapterCount)
-                        {
-                            bookService.JumpToLineInChapter(globalIndex, 0);
-                            return;
-                        }
-                        break;
+                        bookService.JumpToLineInChapter(currentChapterIndex, 0);
+                        return;
                     case ConsoleKey.Escape:
                         return;
                     default:
@@ -426,7 +411,8 @@ namespace Moyu.UI
                             int gIndex = chapterPage * pageSize + selIndex;
                             if (selIndex >= 0 && gIndex < chapterCount)
                             {
-                                bookService.JumpToLineInChapter(gIndex, 0);
+                                currentChapterIndex = gIndex;
+                                bookService.JumpToLineInChapter(currentChapterIndex, 0);
                                 return;
                             }
                         }
@@ -434,5 +420,6 @@ namespace Moyu.UI
                 }
             }
         }
+
     }
 }
