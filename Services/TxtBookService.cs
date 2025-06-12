@@ -111,7 +111,19 @@ namespace Moyu.Services
             currentBook.LastReadTime = DateTime.Now;
             currentBook.CurrentChapterIndex = FindCurrentChapterIndex(currentBook.MarkLoc);
         }
+        public void NextLine()
+        {
+            currentLineCount++;
+            if (currentLineCount >= _wrappedLines.Count)
+            {
+                currentLineCount = _wrappedLines.Count - 1;
+            }
 
+            currentBook.MarkLoc = _wrappedLineToOriginalLineMap[currentLineCount];
+            currentBook.MarkProgress = (float)currentBook.MarkLoc / _originalLines.Count;
+            currentBook.LastReadTime = DateTime.Now;
+            currentBook.CurrentChapterIndex = FindCurrentChapterIndex(currentBook.MarkLoc);
+        }
         public int GetChaptersCount() => _chapters.Count;
 
         public List<ChapterInfo> GetChaptersPage(int start, int end)

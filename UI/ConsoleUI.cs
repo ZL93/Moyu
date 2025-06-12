@@ -11,11 +11,10 @@ namespace Moyu.UI
 {
     public class ConsoleUI
     {
-        private BookService bookService = new BookService();
-        private bool bossKeyDown = false;
         private const char BOSSKEY1 = '·';
         private const char BOSSKEY2 = '`';
-
+        private BookService bookService = new BookService();
+        private bool bossKeyDown = false;
         public void Run()
         {
             Console.CursorVisible = false;
@@ -269,57 +268,136 @@ namespace Moyu.UI
             ConsoleHelper.ClearAll();
             Console.WriteLine("加载中，请稍候...");
             bookService.LoadBook(book);
+
             bool exit = false;
+            bool isAutoRead = false;
+            bool paused = false;
+            int autoReadDelay = Config.Instance.AutoReadDelay > 0 ? Config.Instance.AutoReadDelay : 700;
+
             while (!exit)
             {
-                Console.Clear();
-                if (bossKeyDown)
+                if (!isAutoRead)
                 {
-                    Console.WriteLine("正在更新中，请稍候...");
+                    // 普通阅读模式
+                    Console.Clear();
+                    if (bossKeyDown)
+                    {
+                        Console.WriteLine("正在更新中，请稍候...");
+                    }
+                    else
+                    {
+                        string pageContent = bookService.GetCurrentPage();
+                        Console.WriteLine(pageContent);
+
+                        if (Config.Instance.ShowHelpInfo)
+                        {
+                            Console.WriteLine("\n操作说明：");
+                            Console.WriteLine(" ←/A 上一页    →/D 下一页    T 选择章节");
+                            Console.WriteLine(" 空格自动阅读");
+                        }
+                    }
+                    var key = Console.ReadKey(true);
+
+                    if (key.KeyChar == BOSSKEY1 || key.KeyChar == BOSSKEY2)
+                    {
+                        bossKeyDown = !bossKeyDown;
+                        continue;
+                    }
+                    if (bossKeyDown)
+                        continue;
+
+                    switch (key.Key)
+                    {
+                        case ConsoleKey.RightArrow:
+                        case ConsoleKey.D:
+                            bookService.NextPage();
+                            Config.Instance.SaveConfig();
+                            break;
+                        case ConsoleKey.LeftArrow:
+                        case ConsoleKey.A:
+                            bookService.PrevPage();
+                            Config.Instance.SaveConfig();
+                            break;
+                        case ConsoleKey.T:
+                            ShowChapters(book);
+                            break;
+                        case ConsoleKey.Spacebar:
+                            isAutoRead = true;
+                            paused = false;
+                            Thread.Sleep(Config.Instance.AutoReadDelay / 2);
+                            break;
+                        case ConsoleKey.Escape:
+                            exit = true;
+                            break;
+                        default:
+                            break;
+                    }
                 }
                 else
                 {
-                    string pageContent = bookService.GetCurrentPage();
-                    Console.WriteLine(pageContent);
-
-                    if (Config.Instance.ShowHelpInfo)
+                    // 自动阅读模式
+                    string lastPageContent = null;
+                    while (isAutoRead && !exit)
                     {
-                        Console.WriteLine("\n操作说明：");
-                        Console.WriteLine(" ←/A 上一页    →/D 下一页    T 选择章节");
+                        if (!paused)
+                        {
+                            bookService.NextLine();
+                            string pageContent = bookService.GetCurrentPage();
+                            if (pageContent != lastPageContent)
+                            {
+                                Console.Clear();
+                                Console.WriteLine(pageContent);
+                                if (Config.Instance.ShowHelpInfo)
+                                {
+                                    Console.WriteLine("\n操作说明：");
+                                    Console.WriteLine(" 空格退出自动阅读  +/- 调节速度");
+                                }
+                                lastPageContent = pageContent;
+                            }
+                        }
+
+                        int sleepCount = autoReadDelay / 50;
+                        for (int i = 0; i < sleepCount; i++)
+                        {
+                            if (Console.KeyAvailable)
+                            {
+                                var key = Console.ReadKey(true);
+                                if (key.KeyChar == BOSSKEY1 || key.KeyChar == BOSSKEY2)
+                                {
+                                    paused = bossKeyDown = !bossKeyDown;
+                                    if (bossKeyDown)
+                                    {
+                                        Console.Clear();
+                                        Console.WriteLine("正在更新中，请稍候...");
+                                    }
+                                    break;
+                                }
+                                else if (key.Key == ConsoleKey.Spacebar)
+                                {
+                                    isAutoRead = false;
+                                    break;
+                                }
+                                else if (key.Key == ConsoleKey.Add || key.Key == ConsoleKey.OemPlus)
+                                {
+                                    autoReadDelay = Math.Max(100, autoReadDelay - 100);
+                                    Config.Instance.AutoReadDelay = autoReadDelay;
+                                }
+                                else if (key.Key == ConsoleKey.Subtract || key.Key == ConsoleKey.OemMinus)
+                                {
+                                    autoReadDelay = Math.Min(2000, autoReadDelay + 100);
+                                    Config.Instance.AutoReadDelay = autoReadDelay;
+                                }
+                                else if (key.Key == ConsoleKey.Escape)
+                                {
+                                    isAutoRead = false;
+                                    exit = true;
+                                    break;
+                                }
+                            }
+                            Thread.Sleep(50);
+                        }
                     }
-                }
-                var key = Console.ReadKey(true);
-
-                if (key.KeyChar == BOSSKEY1 || key.KeyChar == BOSSKEY2)
-                {
-                    bossKeyDown = !bossKeyDown;
-                    continue;
-                }
-                if (bossKeyDown)
-                {
-                    continue;
-                }
-
-                switch (key.Key)
-                {
-                    case ConsoleKey.RightArrow:
-                    case ConsoleKey.D:
-                        bookService.NextPage();
-                        Config.Instance.SaveConfig();
-                        break;
-                    case ConsoleKey.LeftArrow:
-                    case ConsoleKey.A:
-                        bookService.PrevPage();
-                        Config.Instance.SaveConfig();
-                        break;
-                    case ConsoleKey.T:
-                        ShowChapters(book);
-                        break;
-                    case ConsoleKey.Escape:
-                        exit = true;
-                        break;
-                    default:
-                        break;
+                    Config.Instance.SaveConfig();
                 }
             }
         }
@@ -420,6 +498,5 @@ namespace Moyu.UI
                 }
             }
         }
-
     }
 }

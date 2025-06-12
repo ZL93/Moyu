@@ -34,6 +34,7 @@ namespace Moyu.Services
         }
         public void NextPage() => _innerService.NextPage();
         public void PrevPage() => _innerService.PrevPage();
+        public void NextLine() => _innerService.NextLine();
         public int GetChaptersCount() => _innerService.GetChaptersCount();
         public List<ChapterInfo> GetChaptersPage(int start, int end) => _innerService.GetChaptersPage(start, end);
 

@@ -57,5 +57,7 @@ namespace Moyu.Services
         /// 翻到上一页，并更新书签等状态。
         /// </summary>
         void PrevPage();
+
+        void NextLine();
     }
 }

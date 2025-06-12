@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using VersOne.Epub;
 
 namespace Moyu.Services
@@ -169,6 +170,26 @@ namespace Moyu.Services
                 else
                 {
                     currentBook.CurrentReadChapterLine = 0;
+                }
+            }
+        }
+
+        public void NextLine()
+        {
+            currentBook.LastReadTime = DateTime.Now;
+            currentBook.CurrentReadChapterLine++;
+            if (currentBook.CurrentReadChapterLine >= _wrappedLines.Count)
+            {
+                if (currentBook.CurrentChapterIndex < chapterList.Count - 1)
+                {
+                    currentBook.CurrentChapterIndex++;
+                    currentBook.CurrentReadChapterLine = 0;
+                    currentBook.MarkProgress = (float)currentBook.CurrentChapterIndex / chapterList.Count;
+                    GetCurrentChapter();
+                }
+                else
+                {
+                    currentBook.CurrentReadChapterLine = Math.Max(0, _wrappedLines.Count - _pageSize);
                 }
             }
         }
