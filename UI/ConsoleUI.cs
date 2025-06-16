@@ -272,7 +272,7 @@ namespace Moyu.UI
             bool exit = false;
             bool isAutoRead = false;
             bool paused = false;
-            int autoReadDelay = Config.Instance.AutoReadDelay > 0 ? Config.Instance.AutoReadDelay : 700;
+            
 
             while (!exit)
             {
@@ -286,8 +286,8 @@ namespace Moyu.UI
                     }
                     else
                     {
-                        string pageContent = bookService.GetCurrentPage();
-                        Console.WriteLine(pageContent);
+                        string[] pageContent = bookService.GetCurrentPage();
+                        Console.WriteLine(string.Join(Environment.NewLine, pageContent));
 
                         if (Config.Instance.ShowHelpInfo)
                         {
@@ -324,7 +324,7 @@ namespace Moyu.UI
                         case ConsoleKey.Spacebar:
                             isAutoRead = true;
                             paused = false;
-                            Thread.Sleep(Config.Instance.AutoReadDelay / 2);
+                            Thread.Sleep(300);
                             break;
                         case ConsoleKey.Escape:
                             exit = true;
@@ -335,28 +335,50 @@ namespace Moyu.UI
                 }
                 else
                 {
+                    int lineDelay = 300;
+                    int charDelay = Config.Instance.AutoReadDelay > 0 ? Config.Instance.AutoReadDelay : 50;
                     // 自动阅读模式
-                    string lastPageContent = null;
+                    string[] lastPageContent = null;
                     while (isAutoRead && !exit)
                     {
                         if (!paused)
                         {
                             bookService.NextLine();
-                            string pageContent = bookService.GetCurrentPage();
+                            string[] pageContent = bookService.GetCurrentPage();
                             if (pageContent != lastPageContent)
                             {
                                 Console.Clear();
-                                Console.WriteLine(pageContent);
+                                int midIndex = pageContent.Length / 2;
+
+                                for (int i = 0; i < pageContent.Length; i++)
+                                {
+                                    if (i == midIndex)
+                                    {
+                                        Console.ForegroundColor = ConsoleColor.Gray;
+                                        Console.WriteLine(pageContent[i]);
+                                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine(pageContent[i]);
+                                    }
+                                }
+
                                 if (Config.Instance.ShowHelpInfo)
                                 {
                                     Console.WriteLine("\n操作说明：");
                                     Console.WriteLine(" 空格退出自动阅读  +/- 调节速度");
                                 }
+
                                 lastPageContent = pageContent;
+
+                                // 自动阅读延时 = 当前行长度 × 每字符毫秒数（AutoReadDelay）
+                                int charCount = pageContent[midIndex]?.Length ?? 0;
+                                lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
                             }
                         }
 
-                        int sleepCount = autoReadDelay / 50;
+                        int sleepCount = lineDelay / 50;
                         for (int i = 0; i < sleepCount; i++)
                         {
                             if (Console.KeyAvailable)
@@ -379,13 +401,13 @@ namespace Moyu.UI
                                 }
                                 else if (key.Key == ConsoleKey.Add || key.Key == ConsoleKey.OemPlus)
                                 {
-                                    autoReadDelay = Math.Max(100, autoReadDelay - 100);
-                                    Config.Instance.AutoReadDelay = autoReadDelay;
+                                    charDelay = Math.Max(10, charDelay - 10);
+                                    Config.Instance.AutoReadDelay = charDelay;
                                 }
                                 else if (key.Key == ConsoleKey.Subtract || key.Key == ConsoleKey.OemMinus)
                                 {
-                                    autoReadDelay = Math.Min(2000, autoReadDelay + 100);
-                                    Config.Instance.AutoReadDelay = autoReadDelay;
+                                    charDelay = Math.Min(500, charDelay + 10);
+                                    Config.Instance.AutoReadDelay = charDelay;
                                 }
                                 else if (key.Key == ConsoleKey.Escape)
                                 {

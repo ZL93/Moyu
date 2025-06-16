@@ -60,6 +60,7 @@
     <Compile Include="Services\TxtBookService.cs" />
     <Compile Include="UI\ConsoleUI.cs" />
     <Compile Include="Utils\ConsoleHelper.cs" />
+    <Compile Include="Utils\MathEx.cs" />
     <Compile Include="Utils\SysEnvironment.cs" />
     <Compile Include="Utils\TextFileReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

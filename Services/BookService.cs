@@ -38,7 +38,7 @@ namespace Moyu.Services
         public int GetChaptersCount() => _innerService.GetChaptersCount();
         public List<ChapterInfo> GetChaptersPage(int start, int end) => _innerService.GetChaptersPage(start, end);
 
-        public string GetCurrentPage() => _innerService.GetCurrentPage();
+        public string[] GetCurrentPage() => _innerService.GetCurrentPage();
     }
 
 }

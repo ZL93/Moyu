@@ -13,7 +13,7 @@ namespace Moyu
         public static Config Instance => _instance.Value;
        
         public bool ShowHelpInfo { get; set; } = true;
-        public int AutoReadDelay { get; set; } = 700;
+        public int AutoReadDelay { get; set; } = 50;
         public List<BookInfo> bookInfos { get; set; } = new List<BookInfo>();
 
         // 保存配置

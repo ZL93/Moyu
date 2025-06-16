@@ -63,14 +63,14 @@ namespace Moyu.Services
             currentBook.MarkProgress = (float)currentBook.CurrentChapterIndex / chapterList.Count;
         }
 
-        public string GetCurrentPage()
+        public string[] GetCurrentPage()
         {
             currentBook.LastReadTime = DateTime.Now;
             GetCurrentChapter();
             int startLine = currentBook.CurrentReadChapterLine;
             if (startLine >= _wrappedLines.Count)
             {
-                return string.Empty;
+                return new string[] { };
             }
 
 
@@ -84,9 +84,8 @@ namespace Moyu.Services
                 _pageSize = Console.WindowHeight - 1;
             }
             int count = Math.Min(_pageSize, _wrappedLines.Count - startLine);
-            var pageLines = _wrappedLines.GetRange(startLine, count);
+            return _wrappedLines.GetRange(startLine, count).ToArray();
 
-            return string.Join(Environment.NewLine, pageLines);
         }
 
         private void GetCurrentChapter()

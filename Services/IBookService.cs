@@ -47,7 +47,7 @@ namespace Moyu.Services
         /// 获取当前页的内容（适配不同格式的分页）。
         /// </summary>
         /// <returns>当前页内容</returns>
-        string GetCurrentPage();
+        string[] GetCurrentPage();
         /// <summary>
         /// 翻到下一页，并更新书签等状态。
         /// </summary>

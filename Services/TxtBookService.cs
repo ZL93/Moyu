@@ -130,13 +130,13 @@ namespace Moyu.Services
         {
             return _chapters.Skip(start).Take(end - start).ToList();
         }
-        public string GetCurrentPage()
+        public string[] GetCurrentPage()
         {
             currentBook.LastReadTime = DateTime.Now;
             int startLine = currentLineCount;
             if (startLine >= _wrappedLines.Count)
             {
-                return string.Empty;
+                return new string[] { };
             }
 
             // 计算当前页的行数
@@ -149,9 +149,7 @@ namespace Moyu.Services
                 _pageSize = Console.WindowHeight - 1;
             }
             int count = Math.Min(_pageSize, _wrappedLines.Count - startLine);
-            var pageLines = _wrappedLines.GetRange(startLine, count);
-
-            return string.Join(Environment.NewLine, pageLines);
+            return _wrappedLines.GetRange(startLine, count).ToArray();
         }
 
         private void DetectChapters()
