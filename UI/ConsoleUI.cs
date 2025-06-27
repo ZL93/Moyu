@@ -272,7 +272,8 @@ namespace Moyu.UI
             bool exit = false;
             bool isAutoRead = false;
             bool paused = false;
-            
+            bool isFirstRead = true;
+            int autoReadLineIndex = 0;
 
             while (!exit)
             {
@@ -343,39 +344,51 @@ namespace Moyu.UI
                     {
                         if (!paused)
                         {
-                            bookService.NextLine();
                             string[] pageContent = bookService.GetCurrentPage();
-                            if (pageContent != lastPageContent)
+                            if (pageContent == null || pageContent.Length == 0)
+                                continue;
+
+                            int midIndex = pageContent.Length / 2;
+                            autoReadLineIndex = Math.Min(autoReadLineIndex, pageContent.Length - 1);
+
+                            int charCount = 10;
+
+                            if (isFirstRead)
                             {
                                 Console.Clear();
-                                int midIndex = pageContent.Length / 2;
-
-                                for (int i = 0; i < pageContent.Length; i++)
+                                PrintPage(pageContent, autoReadLineIndex);
+                                // 设置延时
+                                charCount = pageContent[autoReadLineIndex]?.Length ?? 0;
+                                if (autoReadLineIndex >= midIndex)
                                 {
-                                    if (i == midIndex)
-                                    {
-                                        Console.ForegroundColor = ConsoleColor.Gray;
-                                        Console.WriteLine(pageContent[i]);
-                                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine(pageContent[i]);
-                                    }
+                                    isFirstRead = false;
                                 }
-
-                                if (Config.Instance.ShowHelpInfo)
+                                else
                                 {
-                                    Console.WriteLine("\n操作说明：");
-                                    Console.WriteLine(" 空格退出自动阅读  +/- 调节速度");
+                                    autoReadLineIndex++;
                                 }
-
-                                lastPageContent = pageContent;
-
-                                // 自动阅读延时 = 当前行长度 × 每字符毫秒数（AutoReadDelay）
-                                int charCount = pageContent[midIndex]?.Length ?? 0;
-                                lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
                             }
+                            else
+                            {
+                                bookService.NextLine();
+                                pageContent = bookService.GetCurrentPage();
+                                if (pageContent != lastPageContent && pageContent != null && pageContent.Length > 0)
+                                {
+                                    Console.Clear();
+                                    midIndex = pageContent.Length / 2;
+                                    PrintPage(pageContent, midIndex);
+                                    lastPageContent = pageContent;
+                                    charCount = pageContent[midIndex]?.Length ?? 0;
+                                    
+                                }
+                            }
+                            lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
+                            if (Config.Instance.ShowHelpInfo)
+                            {
+                                Console.WriteLine("\n操作说明：");
+                                Console.WriteLine(" 空格退出自动阅读  +/- 调节速度");
+                            }
+
                         }
 
                         int sleepCount = lineDelay / 50;
@@ -419,11 +432,21 @@ namespace Moyu.UI
                             Thread.Sleep(50);
                         }
                     }
+                    autoReadLineIndex = 0;
+                    isFirstRead = true;
                     Config.Instance.SaveConfig();
                 }
             }
         }
-
+        // 封装高亮打印页面内容
+        private void PrintPage(string[] lines, int highlightIndex)
+        {
+            for (int i = 0; i < lines.Length; i++)
+            {
+                Console.ForegroundColor = i == highlightIndex ? ConsoleColor.Gray : ConsoleColor.DarkGray;
+                Console.WriteLine(lines[i]);
+            }
+        }
         private void ShowChapters(BookInfo book)
         {
             int chapterCount = bookService.GetChaptersCount();
