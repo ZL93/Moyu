@@ -229,6 +229,8 @@ namespace Moyu.UI
                 Thread.Sleep(500);
                 return;
             }
+            Console.Clear();
+            Console.Write("\n搜索中...");
             var booksList = bookSearch.SearchBooks(inputName);
 
             int globalIndex = 0;
