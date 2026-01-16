@@ -3,6 +3,7 @@
     public enum BookFormatEnum
     {
         Txt,
-        Epub
+        Epub,
+        Online
     }
 }

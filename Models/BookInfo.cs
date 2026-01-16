@@ -17,6 +17,10 @@ namespace Moyu.Models
         /// </summary>
         public string Author { get; set; } = string.Empty;
         /// <summary>
+        /// 书籍简介
+        /// </summary>
+        public string Introduction { get; set; } = string.Empty;
+        /// <summary>
         /// 书籍类型
         /// </summary>
         public BookFormatEnum Format { get; set; } = BookFormatEnum.Txt;

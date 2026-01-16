@@ -1,11 +1,14 @@
 ﻿using Moyu.Models;
+using Moyu.Models.Online;
 using Moyu.Services;
 using Moyu.Utils;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Moyu.UI
 {
@@ -14,11 +17,14 @@ namespace Moyu.UI
         private const char BOSSKEY1 = '·';
         private const char BOSSKEY2 = '`';
         private BookService bookService = new BookService();
+        private OnlineBookService onlineBookService = new OnlineBookService();
         private bool bossKeyDown = false;
         public void Run()
         {
             Console.CursorVisible = false;
             Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
 
             Config.Instance.LoadConfig();
             Config.Instance.bookInfos = Config.Instance.bookInfos.OrderByDescending(b => b.LastReadTime).ToList();
@@ -93,6 +99,9 @@ namespace Moyu.UI
                     case ConsoleKey.O:
                         AddBook();
                         break;
+                    case ConsoleKey.F:
+                        SerachBook();
+                        break;
                     case ConsoleKey.Delete:
                         Console.Clear();
                         Console.Write("\n确认删除请按Y键");
@@ -133,6 +142,7 @@ namespace Moyu.UI
                         {
                             int selectedIndex = key.KeyChar - '0' - 1;
                             int index = currentPage * pageSize + selectedIndex;
+
                             if (selectedIndex >= 0 && index < booksCount)
                             {
                                 ReadBook(booksList[index]);
@@ -193,7 +203,151 @@ namespace Moyu.UI
                 Console.WriteLine("\n操作说明：");
                 Console.WriteLine(" ↑/W ↓/S 选择书籍    Enter 打开    ESC 返回");
                 Console.WriteLine(" ←/A →/D 翻页        O 添加书籍    Delete 删除");
-                Console.WriteLine(" P 设置环境变量      H 开启/关闭操作说明");
+                Console.WriteLine(" P 设置环境变量      H 开启/关闭操作说明    F 搜索在线小说");
+            }
+        }
+
+        private void SerachBook()
+        {
+            Console.Clear();
+            Console.Write("\n请输入小说名称：");
+            string inputName = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(inputName))
+            {
+                Console.WriteLine("名称不能为空！");
+                Thread.Sleep(500);
+                return;
+            }
+            var booksList = onlineBookService.SearchNovels(inputName);
+
+            int globalIndex = 0;
+            int pageSize = 10;
+            while (true)
+            {
+                // 计算当前页的行数
+                if (Config.Instance.ShowHelpInfo)
+                {
+                    pageSize = Console.WindowHeight - 10;
+                }
+                else
+                {
+                    pageSize = Console.WindowHeight - 3;
+                }
+                int booksCount = booksList.Count; //总书籍数量
+                int currentPage = globalIndex / pageSize; // 计算当前页的索引
+                int selectedIndexInPage = globalIndex % pageSize; //
+
+                ConsoleHelper.ClearAll();
+                if (bossKeyDown)
+                {
+                    Console.WriteLine("正在更新中，请稍候...");
+                }
+                else
+                {
+                    ShowSerachBookShelf(booksList, currentPage, selectedIndexInPage, pageSize);
+                }
+
+                var key = Console.ReadKey(true);
+
+                if (key.KeyChar == BOSSKEY1 || key.KeyChar == BOSSKEY2)
+                {
+                    bossKeyDown = !bossKeyDown;
+                    continue;
+                }
+                if (bossKeyDown)
+                {
+                    continue;
+                }
+
+                switch (key.Key)
+                {
+                    case ConsoleKey.Escape:
+                        ConsoleHelper.ClearAll();
+                        return;
+                    case ConsoleKey.RightArrow:
+                    case ConsoleKey.D:
+                        globalIndex = Math.Min(booksCount - 1, globalIndex + pageSize);
+                        break;
+                    case ConsoleKey.LeftArrow:
+                    case ConsoleKey.A:
+                        globalIndex = Math.Max(0, globalIndex - pageSize);
+                        break;
+                    case ConsoleKey.UpArrow:
+                    case ConsoleKey.W:
+                        globalIndex = Math.Max(0, globalIndex - 1);
+                        break;
+                    case ConsoleKey.DownArrow:
+                    case ConsoleKey.S:
+                        globalIndex = Math.Min(booksCount - 1, globalIndex + 1);
+                        break;
+                    case ConsoleKey.Enter:
+                        if (globalIndex >= 0 && globalIndex < booksCount)
+                        {
+                            Config.Instance.bookInfos.Insert(0, booksList[globalIndex]);
+                            ReadBook(booksList[globalIndex]);
+                        }
+                        break;
+                    default:
+                        if (char.IsDigit(key.KeyChar))
+                        {
+                            int selectedIndex = key.KeyChar - '0' - 1;
+                            int index = currentPage * pageSize + selectedIndex;
+
+                            if (selectedIndex >= 0 && index < booksCount)
+                            {
+                                Config.Instance.bookInfos.Insert(0, booksList[globalIndex]);
+                                ReadBook(booksList[index]);
+                            }
+                        }
+                        break;
+                }
+            }
+
+        }
+
+        private void ShowSerachBookShelf(List<BookInfo> books, int currentPage, int selectedIndexInPage, int pageSize)
+        {
+            int totalBooks = books.Count;
+            int totalPages = (totalBooks + pageSize - 1) / pageSize;// 计算总页数
+            int start = currentPage * pageSize;// 计算当前页的起始索引
+            int end = Math.Min(start + pageSize, totalBooks); // 计算当前页的结束索引
+
+            Console.WriteLine($"书架目录（第 {currentPage + 1}/{totalPages} 页）\n");
+
+            for (int i = start; i < end; i++)
+            {
+                int indexInPage = i - start;
+                var book = books[i];
+
+                string progressStr = book.MarkProgress.ToString("P0").PadRight(6);
+                string dateStr = book.LastReadTime.ToString("yy/MM/dd");
+
+                string indexStr = $"[{indexInPage + 1}]";
+                string prefix = "  ";
+                if (indexInPage == selectedIndexInPage)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    prefix = ">>";
+                }
+
+                var bookName = book.Title;
+                if (!string.IsNullOrEmpty(book.Author))
+                {
+                    bookName += $" - {book.Author} ";
+                }
+
+                string titleStr = $"{prefix} {indexStr} {TextFileReader.Truncate(bookName, 30)}";
+                string padStr = TextFileReader.PadRightDisplay(titleStr, 40);
+
+                Console.WriteLine(TextFileReader.Truncate($"{padStr}    {book.Introduction}", Console.WindowWidth - 5));
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+            }
+
+            if (Config.Instance.ShowHelpInfo)
+            {
+                Console.WriteLine("\n操作说明：");
+                Console.WriteLine(" ↑/W ↓/S 选择书籍    Enter 打开    ESC 返回");
+                Console.WriteLine(" ←/A →/D 翻页");
             }
         }
 
@@ -267,6 +421,10 @@ namespace Moyu.UI
         {
             ConsoleHelper.ClearAll();
             Console.WriteLine("加载中，请稍候...");
+
+            // 判断是否是在线小说
+            bool isOnline = book.Format == BookFormatEnum.Online;
+
             bookService.LoadBook(book);
 
             bool exit = false;
@@ -311,15 +469,21 @@ namespace Moyu.UI
                     {
                         case ConsoleKey.RightArrow:
                         case ConsoleKey.D:
+                            autoReadLineIndex = 0;
+                            isFirstRead = true;
                             bookService.NextPage();
                             Config.Instance.SaveConfig();
                             break;
                         case ConsoleKey.LeftArrow:
                         case ConsoleKey.A:
+                            autoReadLineIndex = 0;
+                            isFirstRead = true;
                             bookService.PrevPage();
                             Config.Instance.SaveConfig();
                             break;
                         case ConsoleKey.T:
+                            autoReadLineIndex = 0;
+                            isFirstRead = true;
                             ShowChapters(book);
                             break;
                         case ConsoleKey.Spacebar:
@@ -345,9 +509,9 @@ namespace Moyu.UI
                         if (!paused)
                         {
                             string[] pageContent = bookService.GetCurrentPage();
+                            var i = book.CurrentReadChapterLine;
                             if (pageContent == null || pageContent.Length == 0)
                                 continue;
-
                             int midIndex = pageContent.Length / 2;
                             autoReadLineIndex = Math.Min(autoReadLineIndex, pageContent.Length - 1);
 
@@ -382,6 +546,9 @@ namespace Moyu.UI
                                     
                                 }
                             }
+
+
+
                             lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
                             if (Config.Instance.ShowHelpInfo)
                             {
@@ -432,8 +599,6 @@ namespace Moyu.UI
                             Thread.Sleep(50);
                         }
                     }
-                    autoReadLineIndex = 0;
-                    isFirstRead = true;
                     Config.Instance.SaveConfig();
                 }
             }
@@ -543,5 +708,6 @@ namespace Moyu.UI
                 }
             }
         }
+
     }
 }

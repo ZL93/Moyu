@@ -18,6 +18,9 @@ namespace Moyu.Services
                 case BookFormatEnum.Epub:
                     _innerService = new EpubBookService();
                     break;
+                case  BookFormatEnum.Online:
+                    _innerService = new OnlineBookService();
+                    break;
                 default:
                     throw new NotSupportedException("不支持的格式");
             }
@@ -26,6 +29,11 @@ namespace Moyu.Services
         public void JumpToLineInChapter(int chapterIndex, int lineOffset) => _innerService.JumpToLineInChapter(chapterIndex, lineOffset);
         public BookInfo GetBookInfo(string filePath)
         {
+            if (filePath.StartsWith("online://"))
+            {
+                return new OnlineBookService().GetBookInfo(filePath);
+            }
+
             return filePath.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
                 ? new TxtBookService().GetBookInfo(filePath)
                 : filePath.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)
