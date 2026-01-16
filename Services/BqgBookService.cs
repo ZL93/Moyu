@@ -20,7 +20,7 @@ namespace Moyu.Services
         private string _novelId;
 
         // API配置
-        private const string SearchApiUrl = "https://www.bqg6370.xyz/api/search?q=";
+        private const string SearchApiUrl = "https://apige.cc/api/search?q=";
         private const string BookInfoApiUrl = "https://apige.cc/api/book?id=";
         private const string BookListApiUrl = "https://apige.cc/api/booklist?id=";
         private const string ChapterApiUrl = "https://apige.cc/api/chapter?id={0}&chapterid={1}";
