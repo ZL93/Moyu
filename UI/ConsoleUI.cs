@@ -177,12 +177,25 @@ namespace Moyu.UI
                     prefix = ">>";
                 }
 
-                var bookName = book.Title;
-                if (!string.IsNullOrEmpty(book.Author))
+                string icon = string.Empty;
+                switch (book.Format)
+                {
+                    case BookFormatEnum.Txt:
+                    case BookFormatEnum.Epub:
+                        icon = "📖";
+                        break;
+                    case BookFormatEnum.Online:
+                        icon = "🌐";
+                        break;
+                    default:
+                        break;
+                }
+                var bookName = $"{icon} {book.Title}";
+                if (string.IsNullOrEmpty(book.Author) == false)
                 {
                     bookName += $" - {book.Author}";
                 }
-
+                
                 string titleStr = $"{prefix} {indexStr} {TextFileReader.Truncate(bookName, 30)}";
                 string padStr = TextFileReader.PadRightDisplay(titleStr, 40);
                 if (book.LastReadTime == DateTime.MinValue)
