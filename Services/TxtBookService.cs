@@ -9,19 +9,19 @@ using System.Text.RegularExpressions;
 
 namespace Moyu.Services
 {
-    public class TxtBookService : IBookService
+    public class TxtBookService : BaseBookService
     {
         private List<string> _originalLines = new List<string>();
-        private List<string> _wrappedLines = new List<string>();
         private List<int> _originalLineToWrappedLineMap = new List<int>();
         private List<int> _wrappedLineToOriginalLineMap = new List<int>();
-        private List<ChapterInfo> _chapters = new List<ChapterInfo>();
-        private int currentLineCount = 0;
-        private int _pageSize = 10;
-        private BookInfo currentBook;
 
-        public BookInfo GetBookInfo(string filePath)
+        private bool _isLoaded = false;
+
+        public override BookInfo GetBookInfo(string filePath)
         {
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"文件不存在: {filePath}");
+
             return new BookInfo
             {
                 FilePath = filePath,
@@ -30,33 +30,56 @@ namespace Moyu.Services
             };
         }
 
-        public void LoadBook(BookInfo book)
+        public override void LoadBook(BookInfo book)
         {
-            currentBook = book;
+            base.LoadBook(book);
+
+            // 读取文件内容
             _originalLines = TextFileReader.ReadTextFileLines(book.FilePath);
-            _wrappedLines.Clear();
+            _isLoaded = true;
+
+            // 处理文本包装
+            ProcessTextWrapping();
+
+            // 自动检测章节
+            if (AutoDetectChapters)
+            {
+                DetectChapters();
+            }
+
+            // 恢复阅读位置
+            RestoreReadingPosition();
+        }
+
+        private void ProcessTextWrapping()
+        {
+            WrappedLines.Clear();
             _originalLineToWrappedLineMap.Clear();
             _wrappedLineToOriginalLineMap.Clear();
 
             int width = Console.WindowWidth;
+
             for (int i = 0; i < _originalLines.Count; i++)
             {
                 string line = _originalLines[i];
-                _originalLineToWrappedLineMap.Add(_wrappedLines.Count);
+                _originalLineToWrappedLineMap.Add(WrappedLines.Count);
+
                 if (string.IsNullOrWhiteSpace(line))
                 {
-                    _wrappedLines.Add("");
+                    WrappedLines.Add("");
                     _wrappedLineToOriginalLineMap.Add(i);
                     continue;
                 }
+
                 var sb = new StringBuilder();
                 int currentWidth = 0;
+
                 foreach (char c in line)
                 {
-                    int charWidth = TextFileReader.GetCharDisplayWidth(c);
+                    int charWidth = GetCharDisplayWidth(c);
                     if (currentWidth + charWidth > width)
                     {
-                        _wrappedLines.Add(sb.ToString());
+                        WrappedLines.Add(sb.ToString());
                         _wrappedLineToOriginalLineMap.Add(i);
                         sb.Clear();
                         currentWidth = 0;
@@ -64,128 +87,150 @@ namespace Moyu.Services
                     sb.Append(c);
                     currentWidth += charWidth;
                 }
+
                 if (sb.Length > 0)
                 {
-                    _wrappedLines.Add(sb.ToString());
+                    WrappedLines.Add(sb.ToString());
                     _wrappedLineToOriginalLineMap.Add(i);
                 }
             }
-
-            currentLineCount = book.MarkLoc >= 0 && book.MarkLoc < _originalLineToWrappedLineMap.Count
-                ? _originalLineToWrappedLineMap[book.MarkLoc] : 0;
-
-            DetectChapters();
-        }
-
-        public void JumpToLineInChapter(int chapterIndex, int lineOffset)
-        {
-            if (chapterIndex < 0 || chapterIndex >= _chapters.Count)
-            {
-                return;
-            }
-
-            int target = _chapters[chapterIndex].LineIndex + lineOffset;
-            JumpToLine(target);
-        }
-
-        public void NextPage()
-        {
-            currentLineCount += _pageSize;
-            if (currentLineCount >= _wrappedLines.Count)
-            {
-                currentLineCount = _wrappedLines.Count - 1;
-            }
-
-            currentBook.MarkLoc = _wrappedLineToOriginalLineMap[currentLineCount];
-            currentBook.MarkProgress = (float)currentBook.MarkLoc / _originalLines.Count;
-            currentBook.LastReadTime = DateTime.Now;
-            currentBook.CurrentChapterIndex = FindCurrentChapterIndex(currentBook.MarkLoc);
-        }
-
-        public void PrevPage()
-        {
-            currentLineCount = Math.Max(0, currentLineCount - _pageSize);
-
-            currentBook.MarkLoc = _wrappedLineToOriginalLineMap[currentLineCount];
-            currentBook.MarkProgress = (float)currentBook.MarkLoc / _originalLines.Count;
-            currentBook.LastReadTime = DateTime.Now;
-            currentBook.CurrentChapterIndex = FindCurrentChapterIndex(currentBook.MarkLoc);
-        }
-        public void NextLine()
-        {
-            currentLineCount++;
-            if (currentLineCount >= _wrappedLines.Count)
-            {
-                currentLineCount = _wrappedLines.Count - 1;
-            }
-
-            currentBook.MarkLoc = _wrappedLineToOriginalLineMap[currentLineCount];
-            currentBook.MarkProgress = (float)currentBook.MarkLoc / _originalLines.Count;
-            currentBook.LastReadTime = DateTime.Now;
-            currentBook.CurrentChapterIndex = FindCurrentChapterIndex(currentBook.MarkLoc);
-        }
-        public int GetChaptersCount() => _chapters.Count;
-
-        public List<ChapterInfo> GetChaptersPage(int start, int end)
-        {
-            return _chapters.Skip(start).Take(end - start).ToList();
-        }
-        public string[] GetCurrentPage()
-        {
-            currentBook.LastReadTime = DateTime.Now;
-            int startLine = currentLineCount;
-            if (startLine >= _wrappedLines.Count)
-            {
-                return new string[] { };
-            }
-
-            // 计算当前页的行数
-            if (Config.Instance.ShowHelpInfo)
-            {
-                _pageSize = Console.WindowHeight - 5;
-            }
-            else
-            {
-                _pageSize = Console.WindowHeight - 1;
-            }
-            int count = Math.Min(_pageSize, _wrappedLines.Count - startLine);
-            return _wrappedLines.GetRange(startLine, count).ToArray();
         }
 
         private void DetectChapters()
         {
-            _chapters.Clear();
-            var regex = new Regex(@"^(第[零一二三四五六七八九十百千万\d]+[章节回卷篇])|(^Chapter\s+\d+)", RegexOptions.Compiled);
+            Chapters.Clear();
+
+            var regex = new Regex(
+                @"^(第[零一二三四五六七八九十百千万\d]+[章节回卷篇])|(^Chapter\s+\d+)|(^\d+\.)",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase
+            );
+
             for (int i = 0; i < _originalLines.Count; i++)
             {
                 string line = _originalLines[i].Trim();
                 if (regex.IsMatch(line))
                 {
-                    _chapters.Add(new ChapterInfo
+                    Chapters.Add(new ChapterInfo
                     {
-                        Title = line.Length > 30 ? line.Substring(0, 30) + "..." : line,
-                        LineIndex = i
+                        Title = line.Length > 50 ? line.Substring(0, 50) + "..." : line,
+                        LineIndex = i,
+                        ChapterIndex = Chapters.Count
                     });
                 }
             }
-        }
-        private int FindCurrentChapterIndex(int lineIndex)
-        {
-            int idx = _chapters.FindLastIndex(c => c.LineIndex <= lineIndex);
-            return idx < 0 ? 0 : idx;
-        }
-        private void JumpToLine(int lineIndex)
-        {
-            if (lineIndex >= _originalLineToWrappedLineMap.Count)
+
+            // 如果没有检测到章节，将整个文件作为一个章节
+            if (Chapters.Count == 0 && _originalLines.Count > 0)
             {
-                return;
+                Chapters.Add(new ChapterInfo
+                {
+                    Title = "全文",
+                    LineIndex = 0,
+                    ChapterIndex = 0
+                });
+            }
+        }
+
+        private void RestoreReadingPosition()
+        {
+            if (CurrentBook == null) return;
+
+            // 如果有书签位置，跳转到书签
+            if (CurrentBook.MarkLoc >= 0 && CurrentBook.MarkLoc < _originalLineToWrappedLineMap.Count)
+            {
+                int wrappedLineIndex = _originalLineToWrappedLineMap[CurrentBook.MarkLoc];
+                CurrentBook.CurrentReadChapterLine = wrappedLineIndex;
+            }
+            // 否则跳转到当前章节
+            else if (CurrentBook.CurrentChapterIndex >= 0 && CurrentBook.CurrentChapterIndex < Chapters.Count)
+            {
+                var chapter = Chapters[CurrentBook.CurrentChapterIndex];
+                if (chapter.LineIndex < _originalLineToWrappedLineMap.Count)
+                {
+                    int wrappedLineIndex = _originalLineToWrappedLineMap[chapter.LineIndex];
+                    CurrentBook.CurrentReadChapterLine = wrappedLineIndex;
+                }
             }
 
-            currentLineCount = _originalLineToWrappedLineMap[lineIndex];
-            currentBook.MarkLoc = lineIndex;
-            currentBook.MarkProgress = (float)currentBook.MarkLoc / _originalLines.Count;
-            currentBook.LastReadTime = DateTime.Now;
-            currentBook.CurrentChapterIndex = FindCurrentChapterIndex(currentBook.MarkLoc);
+            UpdateProgress();
+        }
+
+        protected override void LoadChapterContentInternal(int chapterIndex)
+        {
+            // TXT格式不需要特殊加载，因为所有内容已经加载
+            // 这里主要是确保章节索引正确
+            if (chapterIndex >= 0 && chapterIndex < Chapters.Count)
+            {
+                var chapter = Chapters[chapterIndex];
+                if (chapter.LineIndex < _originalLineToWrappedLineMap.Count)
+                {
+                    int wrappedLineIndex = _originalLineToWrappedLineMap[chapter.LineIndex];
+
+                    // 确保当前行在包装后的行范围内
+                    if (CurrentBook.CurrentReadChapterLine >= WrappedLines.Count)
+                    {
+                        CurrentBook.CurrentReadChapterLine = wrappedLineIndex;
+                    }
+                }
+            }
+        }
+
+        protected override void InitializeChapters()
+        {
+            // 章节已经在LoadBook中初始化
+        }
+
+        public override void JumpToLineInChapter(int chapterIndex, int lineOffset)
+        {
+            if (!_isLoaded) return;
+
+            base.JumpToLineInChapter(chapterIndex, lineOffset);
+
+            // 更新书签位置
+            if (CurrentBook.CurrentReadChapterLine < _wrappedLineToOriginalLineMap.Count)
+            {
+                CurrentBook.MarkLoc = _wrappedLineToOriginalLineMap[CurrentBook.CurrentReadChapterLine];
+            }
+        }
+
+        public override void NextPage()
+        {
+            base.NextPage();
+            UpdateBookmark();
+        }
+
+        public override void PrevPage()
+        {
+            base.PrevPage();
+            UpdateBookmark();
+        }
+
+        public override void NextLine()
+        {
+            base.NextLine();
+            UpdateBookmark();
+        }
+
+        private void UpdateBookmark()
+        {
+            if (CurrentBook == null || CurrentBook.CurrentReadChapterLine >= _wrappedLineToOriginalLineMap.Count)
+                return;
+
+            CurrentBook.MarkLoc = _wrappedLineToOriginalLineMap[CurrentBook.CurrentReadChapterLine];
+            CurrentBook.MarkProgress = (float)CurrentBook.MarkLoc / _originalLines.Count;
+        }
+
+        private int FindCurrentChapterIndex(int lineIndex)
+        {
+            if (Chapters.Count == 0) return -1;
+
+            for (int i = Chapters.Count - 1; i >= 0; i--)
+            {
+                if (Chapters[i].LineIndex <= lineIndex)
+                    return i;
+            }
+
+            return 0;
         }
     }
 }

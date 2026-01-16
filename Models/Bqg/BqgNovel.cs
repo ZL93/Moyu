@@ -1,9 +1,9 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace Moyu.Models.Online
+namespace Moyu.Models.Bqg
 {
-    public class OnlineNovel
+    public class BqgNovel
     {
         [JsonProperty("id")]
         public string Id { get; set; }

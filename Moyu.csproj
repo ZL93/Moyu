@@ -52,16 +52,18 @@
   <ItemGroup>
     <Compile Include="Config.cs" />
     <Compile Include="Models\BookFormatEnum.cs" />
-    <Compile Include="Models\Online\ChapterListResponse.cs" />
-    <Compile Include="Models\Online\OnlineChapter.cs" />
-    <Compile Include="Models\Online\OnlineNovel.cs" />
+    <Compile Include="Models\Bqg\BqgChapterListResponse.cs" />
+    <Compile Include="Models\Bqg\BqgChapter.cs" />
+    <Compile Include="Models\Bqg\BqgNovel.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Models\BookInfo.cs" />
     <Compile Include="Models\ChapterInfo.cs" />
-    <Compile Include="Services\BookService.cs" />
+    <Compile Include="Services\BaseBookService.cs" />
+    <Compile Include="Services\BookServiceFactory.cs" />
     <Compile Include="Services\EpubBookService.cs" />
     <Compile Include="Services\IBookService.cs" />
-    <Compile Include="Services\OnlineBookService.cs" />
+    <Compile Include="Services\BqgBookService.cs" />
+    <Compile Include="Services\Interface1.cs" />
     <Compile Include="Services\TxtBookService.cs" />
     <Compile Include="UI\ConsoleUI.cs" />
     <Compile Include="Utils\ConsoleHelper.cs" />

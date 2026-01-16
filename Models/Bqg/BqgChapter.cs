@@ -1,8 +1,8 @@
 ﻿using Newtonsoft.Json;
 
-namespace Moyu.Models.Online
+namespace Moyu.Models.Bqg
 {
-    public class OnlineChapter
+    public class BqgChapter
     {
         [JsonProperty("id")]
         public string Id { get; set; }

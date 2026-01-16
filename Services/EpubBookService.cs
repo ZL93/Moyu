@@ -1,223 +1,185 @@
 ﻿using Moyu.Models;
-using Moyu.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Net;
 using System.Text.RegularExpressions;
-using System.Threading;
 using VersOne.Epub;
 
 namespace Moyu.Services
 {
-    public class EpubBookService : IBookService
+    public class EpubBookService : BaseBookService
     {
-        private EpubBook epubBook;
-        private BookInfo currentBook;
-        private List<ChapterInfo> chapterList = new List<ChapterInfo>();
-        private int _pageSize = 10;
-        private int currentChapterIndex = -1;
+        private EpubBook _epubBook;
 
-        private List<string> _originalLines = new List<string>();
-        private List<string> _wrappedLines = new List<string>();
-       
-        public BookInfo GetBookInfo(string filePath)
+        public override BookInfo GetBookInfo(string filePath)
         {
-            var book = EpubReader.ReadBook(filePath);
-            return new BookInfo
+            if (!System.IO.File.Exists(filePath))
             {
-                Title = book.Title,
-                Author = string.Join(", ", book.AuthorList),
-                FilePath = filePath,
-                Format =  BookFormatEnum.Epub
-            };
-        }
-        public void LoadBook(BookInfo book) 
-        {
-            currentBook = book;
-            epubBook = EpubReader.ReadBook(currentBook.FilePath);
-            chapterList.Clear();
-            int index = 0;
-            foreach (var chapter in epubBook.Navigation)
+                throw new System.IO.FileNotFoundException($"文件不存在: {filePath}");
+            }
+
+            try
             {
-                chapterList.Add(new ChapterInfo
+                var book = EpubReader.ReadBook(filePath);
+                return new BookInfo
                 {
-                    Title = chapter.Title ?? $"章节 {index + 1}",
-                    ChapterIndex = index
-                });
-                index++;
+                    Title = book.Title ?? "未知标题",
+                    Author = book.AuthorList != null && book.AuthorList.Any()
+                        ? string.Join(", ", book.AuthorList)
+                        : "未知作者",
+                    FilePath = filePath,
+                    Format = BookFormatEnum.Epub,
+                    Introduction = book.Description
+                };
             }
-            book.LastReadTime = DateTime.Now;
-        }
-
-        public List<ChapterInfo> GetChaptersPage(int start, int end)
-        {
-            return chapterList.Skip(start).Take(end - start).ToList();
-        }
-
-        public void JumpToLineInChapter(int chapterIndex, int lineOffset)
-        {
-            currentBook.CurrentChapterIndex = chapterIndex;
-            currentBook.CurrentReadChapterLine = lineOffset;
-
-            currentBook.MarkProgress = (float)currentBook.CurrentChapterIndex / chapterList.Count;
-        }
-
-        public string[] GetCurrentPage()
-        {
-            currentBook.LastReadTime = DateTime.Now;
-            GetCurrentChapter();
-            int startLine = currentBook.CurrentReadChapterLine;
-            if (startLine >= _wrappedLines.Count)
+            catch (Exception ex)
             {
-                return new string[] { };
+                throw new InvalidOperationException($"读取EPUB文件失败: {ex.Message}", ex);
             }
-
-
-            // 计算当前页的行数
-            if (Config.Instance.ShowHelpInfo)
-            {
-                _pageSize = Console.WindowHeight - 5;
-            }
-            else
-            {
-                _pageSize = Console.WindowHeight - 1;
-            }
-            int count = Math.Min(_pageSize, _wrappedLines.Count - startLine);
-            return _wrappedLines.GetRange(startLine, count).ToArray();
-
         }
 
-        private void GetCurrentChapter()
+        public override void LoadBook(BookInfo book)
         {
-            if (currentChapterIndex == currentBook.CurrentChapterIndex)
+            base.LoadBook(book);
+
+            try
+            {
+                _epubBook = EpubReader.ReadBook(book.FilePath);
+                InitializeEpubChapters();
+
+                // 加载当前章节内容
+                if (CurrentBook.CurrentChapterIndex >= 0 && CurrentBook.CurrentChapterIndex < Chapters.Count)
+                {
+                    LoadChapterContent(CurrentBook.CurrentChapterIndex);
+                }
+                else if (Chapters.Count > 0)
+                {
+                    LoadChapterContent(0);
+                    CurrentBook.CurrentChapterIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"加载EPUB书籍失败: {ex.Message}", ex);
+            }
+        }
+
+        private void InitializeEpubChapters()
+        {
+            Chapters.Clear();
+
+            if (_epubBook?.Navigation == null)
             {
                 return;
             }
-            currentChapterIndex = currentBook.CurrentChapterIndex;
-            _originalLines.Clear();
-            _wrappedLines.Clear();
-            var lines = HtmlToPlainText(epubBook.ReadingOrder[currentBook.CurrentChapterIndex].Content);
-            foreach (var line in lines)
+
+            int index = 0;
+            foreach (var navItem in _epubBook.Navigation)
             {
-                _originalLines.Add(line.Trim());
+                Chapters.Add(new ChapterInfo
+                {
+                    Title = navItem.Title ?? $"章节 {index + 1}",
+                    ChapterIndex = index,
+                    // EPUB章节没有LineIndex，使用ChapterIndex
+                    LineIndex = index
+                });
+                index++;
             }
-            
-            int width = Console.WindowWidth;
-            for (int i = 0; i < _originalLines.Count; i++)
+
+            // 如果没有导航，使用阅读顺序
+            if (Chapters.Count == 0 && _epubBook?.ReadingOrder != null)
             {
-                string line = _originalLines[i];
-                if (string.IsNullOrWhiteSpace(line))
+                for (int i = 0; i < _epubBook.ReadingOrder.Count; i++)
                 {
-                    _wrappedLines.Add("");
-                    continue;
-                }
-                var sb = new StringBuilder();
-                int currentWidth = 0;
-                foreach (char c in line)
-                {
-                    int charWidth = TextFileReader.GetCharDisplayWidth(c);
-                    if (currentWidth + charWidth > width)
+                    Chapters.Add(new ChapterInfo
                     {
-                        _wrappedLines.Add(sb.ToString());
-                        sb.Clear();
-                        currentWidth = 0;
-                    }
-                    sb.Append(c);
-                    currentWidth += charWidth;
-                }
-                if (sb.Length > 0)
-                {
-                    _wrappedLines.Add(sb.ToString());
+                        Title = $"章节 {i + 1}",
+                        ChapterIndex = i,
+                        LineIndex = i
+                    });
                 }
             }
         }
 
-
-        public void NextPage()
+        protected override void LoadChapterContentInternal(int chapterIndex)
         {
-            currentBook.LastReadTime = DateTime.Now;
-            currentBook.CurrentReadChapterLine += _pageSize;
-            if (currentBook.CurrentReadChapterLine >= _wrappedLines.Count)
+            if (_epubBook == null || chapterIndex < 0)
             {
-                if (currentBook.CurrentChapterIndex < chapterList.Count - 1)
+                return;
+            }
+
+            try
+            {
+                // 获取章节内容
+                var readingOrder = _epubBook.ReadingOrder;
+                if (chapterIndex >= readingOrder.Count)
                 {
-                    currentBook.CurrentChapterIndex++;
-                    currentBook.CurrentReadChapterLine = 0;
-                    currentBook.MarkProgress = (float)currentBook.CurrentChapterIndex / chapterList.Count;
-                    GetCurrentChapter();
+                    WrappedLines = new List<string> { "章节不存在" };
+                    return;
                 }
-                else
+
+                var chapterFile = readingOrder[chapterIndex];
+                string htmlContent = chapterFile.Content;
+
+                // 转换HTML为纯文本
+                string plainText = HtmlToPlainText(htmlContent);
+
+                // 包装文本
+                int width = Console.WindowWidth;
+                WrappedLines = WrapText(plainText, width);
+
+                // 确保有内容
+                if (WrappedLines.Count == 0)
                 {
-                    currentBook.CurrentReadChapterLine = Math.Max(0, _wrappedLines.Count - _pageSize);
+                    WrappedLines.Add("本章节暂无内容");
                 }
             }
-        }
-        public void PrevPage() 
-        {
-            currentBook.LastReadTime = DateTime.Now;
-            currentBook.CurrentReadChapterLine -= _pageSize;
-            if (currentBook.CurrentReadChapterLine < 0)
+            catch (Exception ex)
             {
-                if (currentBook.CurrentChapterIndex > 0)
-                {
-                    currentBook.CurrentChapterIndex--;
-                    currentBook.MarkProgress = (float)currentBook.CurrentChapterIndex / chapterList.Count;
-                    GetCurrentChapter();
-                    currentBook.CurrentReadChapterLine = Math.Max(_wrappedLines.Count - _pageSize, 0);
-                }
-                else
-                {
-                    currentBook.CurrentReadChapterLine = 0;
-                }
+                WrappedLines = new List<string> { $"加载章节失败: {ex.Message}" };
             }
         }
 
-        public void NextLine()
+        protected override void InitializeChapters()
         {
-            currentBook.LastReadTime = DateTime.Now;
-            currentBook.CurrentReadChapterLine++;
-            if (currentBook.CurrentReadChapterLine >= _wrappedLines.Count)
-            {
-                if (currentBook.CurrentChapterIndex < chapterList.Count - 1)
-                {
-                    currentBook.CurrentChapterIndex++;
-                    currentBook.CurrentReadChapterLine = 0;
-                    currentBook.MarkProgress = (float)currentBook.CurrentChapterIndex / chapterList.Count;
-                    GetCurrentChapter();
-                }
-                else
-                {
-                    currentBook.CurrentReadChapterLine = Math.Max(0, _wrappedLines.Count - _pageSize);
-                }
-            }
+            // 章节已经在LoadBook中初始化
         }
 
-        public int GetChaptersCount() => chapterList.Count;
-       
-        private string[] HtmlToPlainText(string html)
+        private string HtmlToPlainText(string html)
         {
             if (string.IsNullOrWhiteSpace(html))
             {
-                return new string[0];
+                return string.Empty;
             }
 
-            // 1. 移除 script/style 标签及其内容
+            // 移除脚本和样式
             html = Regex.Replace(html, @"<script[^>]*?>[\s\S]*?</script>", string.Empty, RegexOptions.IgnoreCase);
             html = Regex.Replace(html, @"<style[^>]*?>[\s\S]*?</style>", string.Empty, RegexOptions.IgnoreCase);
-            html = Regex.Replace(html, @"<head[^>]*?>[\s\S]*?</head>", string.Empty, RegexOptions.IgnoreCase);
 
-            // 2. 替换常用段落/换行标签为换行符（注意顺序）
-            html = Regex.Replace(html, @"(<br\s*/?>|</p>|</div>|</h\d>)", "\n", RegexOptions.IgnoreCase);
+            // 替换换行标签
+            html = Regex.Replace(html, @"<(br|p|div|h\d)[^>]*>", "\n", RegexOptions.IgnoreCase);
+            html = Regex.Replace(html, @"</(p|div|h\d)[^>]*>", "", RegexOptions.IgnoreCase);
 
-            // 3. 移除所有其他 HTML 标签
-            html = Regex.Replace(html, @"<[^>]+>", string.Empty, RegexOptions.IgnoreCase);
+            html = Regex.Replace(html, @"<head[^>]*>.*?</head>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            
+            // 移除所有HTML标签
+            html = Regex.Replace(html, @"<[^>]+>", string.Empty);
 
-            // 4. 解码 HTML 实体
-            html = System.Net.WebUtility.HtmlDecode(html);
+            // 解码HTML实体
+            html = WebUtility.HtmlDecode(html);
 
-            html = html.Trim();
-            return html.Split('\n');
+            // 清理多余的空格和换行
+            html = Regex.Replace(html, @"^(\s*\n)+", "");
+            html = Regex.Replace(html, @"(\n\s*)+$", "");
+
+            return html.Trim();
+        }
+
+        protected override int GetCharDisplayWidth(char c)
+        {
+            // EPUB可能需要特殊处理某些字符
+            return base.GetCharDisplayWidth(c);
         }
     }
 }

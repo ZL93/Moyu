@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace Moyu.Models.Online
+namespace Moyu.Models.Bqg
 {
-    public class ChapterListResponse
+    public class BqgChapterListResponse
     {
         [JsonProperty("list")]
         public List<string> List { get; set; }

@@ -1,5 +1,4 @@
 ﻿using Moyu.Models;
-using Moyu.Models.Online;
 using Moyu.Services;
 using Moyu.Utils;
 using System;
@@ -8,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Moyu.UI
 {
@@ -16,8 +14,8 @@ namespace Moyu.UI
     {
         private const char BOSSKEY1 = '·';
         private const char BOSSKEY2 = '`';
-        private BookService bookService = new BookService();
-        private OnlineBookService onlineBookService = new OnlineBookService();
+        private IBookService bookService = new TxtBookService();
+        private IBookSearch bookSearch = new BqgBookService();
         private bool bossKeyDown = false;
         public void Run()
         {
@@ -106,7 +104,7 @@ namespace Moyu.UI
                         Console.Clear();
                         Console.Write("\n确认删除请按Y键");
                         if (Console.ReadKey().Key == ConsoleKey.Y)
-                        
+
                         {
                             if (globalIndex >= 0 && globalIndex < booksCount)
                             {
@@ -218,7 +216,7 @@ namespace Moyu.UI
                 Thread.Sleep(500);
                 return;
             }
-            var booksList = onlineBookService.SearchNovels(inputName);
+            var booksList = bookSearch.SearchBooks(inputName);
 
             int globalIndex = 0;
             int pageSize = 10;
@@ -408,8 +406,8 @@ namespace Moyu.UI
             {
                 return;
             }
-
-            Config.Instance.bookInfos.Add(bookService.GetBookInfo(filePath));
+            var service = BookServiceFactory.CreateService(filePath);
+            Config.Instance.bookInfos.Add(service.GetBookInfo(filePath));
         }
 
         private void RemoveBook(string bookName)
@@ -422,9 +420,7 @@ namespace Moyu.UI
             ConsoleHelper.ClearAll();
             Console.WriteLine("加载中，请稍候...");
 
-            // 判断是否是在线小说
-            bool isOnline = book.Format == BookFormatEnum.Online;
-
+            bookService = BookServiceFactory.CreateService(book);
             bookService.LoadBook(book);
 
             bool exit = false;
@@ -463,7 +459,9 @@ namespace Moyu.UI
                         continue;
                     }
                     if (bossKeyDown)
+                    {
                         continue;
+                    }
 
                     switch (key.Key)
                     {
@@ -501,28 +499,49 @@ namespace Moyu.UI
                 else
                 {
                     int lineDelay = 300;
+                    int charCount = 10;
                     int charDelay = Config.Instance.AutoReadDelay > 0 ? Config.Instance.AutoReadDelay : 50;
                     // 自动阅读模式
-                    string[] lastPageContent = null;
                     while (isAutoRead && !exit)
                     {
                         if (!paused)
                         {
-                            string[] pageContent = bookService.GetCurrentPage();
-                            var i = book.CurrentReadChapterLine;
-                            if (pageContent == null || pageContent.Length == 0)
-                                continue;
-                            int midIndex = pageContent.Length / 2;
-                            autoReadLineIndex = Math.Min(autoReadLineIndex, pageContent.Length - 1);
 
-                            int charCount = 10;
+                            if (isFirstRead == false)
+                            {
+                                bookService.NextLine();
+                                if (book.CurrentReadChapterLine == 0)
+                                {
+                                    isFirstRead = true;
+                                    autoReadLineIndex = 0;
+                                }
+                            }
+
+                            string[] pageContent = bookService.GetCurrentPage();
+                            if (pageContent == null || pageContent.Length == 0)
+                            {
+                                continue;
+                            }
+
+                            int midIndex = pageContent.Length / 2;
 
                             if (isFirstRead)
                             {
-                                Console.Clear();
-                                PrintPage(pageContent, autoReadLineIndex);
-                                // 设置延时
-                                charCount = pageContent[autoReadLineIndex]?.Length ?? 0;
+                                autoReadLineIndex = Math.Min(autoReadLineIndex, pageContent.Length - 1);
+                            }
+                            else
+                            {
+                                autoReadLineIndex = midIndex;
+                            }
+
+                            PrintPage(pageContent, autoReadLineIndex);
+
+                            // 设置延时
+                            charCount = pageContent[autoReadLineIndex]?.Length ?? 0;
+                            lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
+
+                            if (isFirstRead)
+                            {
                                 if (autoReadLineIndex >= midIndex)
                                 {
                                     isFirstRead = false;
@@ -531,29 +550,6 @@ namespace Moyu.UI
                                 {
                                     autoReadLineIndex++;
                                 }
-                            }
-                            else
-                            {
-                                bookService.NextLine();
-                                pageContent = bookService.GetCurrentPage();
-                                if (pageContent != lastPageContent && pageContent != null && pageContent.Length > 0)
-                                {
-                                    Console.Clear();
-                                    midIndex = pageContent.Length / 2;
-                                    PrintPage(pageContent, midIndex);
-                                    lastPageContent = pageContent;
-                                    charCount = pageContent[midIndex]?.Length ?? 0;
-                                    
-                                }
-                            }
-
-
-
-                            lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
-                            if (Config.Instance.ShowHelpInfo)
-                            {
-                                Console.WriteLine("\n操作说明：");
-                                Console.WriteLine(" 空格退出自动阅读  +/- 调节速度");
                             }
 
                         }
@@ -606,10 +602,17 @@ namespace Moyu.UI
         // 封装高亮打印页面内容
         private void PrintPage(string[] lines, int highlightIndex)
         {
+            Console.Clear();
             for (int i = 0; i < lines.Length; i++)
             {
                 Console.ForegroundColor = i == highlightIndex ? ConsoleColor.Gray : ConsoleColor.DarkGray;
                 Console.WriteLine(lines[i]);
+            }
+
+            if (Config.Instance.ShowHelpInfo)
+            {
+                Console.WriteLine("\n操作说明：");
+                Console.WriteLine(" 空格退出自动阅读  +/- 调节速度");
             }
         }
         private void ShowChapters(BookInfo book)
@@ -670,22 +673,34 @@ namespace Moyu.UI
                     case ConsoleKey.UpArrow:
                     case ConsoleKey.W:
                         if (currentChapterIndex > 0)
+                        {
                             currentChapterIndex--;
+                        }
+
                         break;
                     case ConsoleKey.DownArrow:
                     case ConsoleKey.S:
                         if (currentChapterIndex < chapterCount - 1)
+                        {
                             currentChapterIndex++;
+                        }
+
                         break;
                     case ConsoleKey.LeftArrow:
                     case ConsoleKey.A:
                         if (chapterPage > 0)
+                        {
                             currentChapterIndex = Math.Max(0, currentChapterIndex - pageSize);
+                        }
+
                         break;
                     case ConsoleKey.RightArrow:
                     case ConsoleKey.D:
                         if ((chapterPage + 1) * pageSize < chapterCount)
+                        {
                             currentChapterIndex = Math.Min(chapterCount - 1, currentChapterIndex + pageSize);
+                        }
+
                         break;
                     case ConsoleKey.Enter:
                         bookService.JumpToLineInChapter(currentChapterIndex, 0);
