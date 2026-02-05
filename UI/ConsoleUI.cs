@@ -195,7 +195,7 @@ namespace Moyu.UI
                 {
                     bookName += $" - {book.Author}";
                 }
-                
+
                 string titleStr = $"{prefix} {indexStr} {TextFileReader.Truncate(bookName, 30)}";
                 string padStr = TextFileReader.PadRightDisplay(titleStr, 40);
                 if (book.LastReadTime == DateTime.MinValue)
@@ -516,27 +516,27 @@ namespace Moyu.UI
                     int lineDelay = 300;
                     int charCount = 10;
                     int charDelay = Config.Instance.AutoReadDelay > 0 ? Config.Instance.AutoReadDelay : 50;
+                    int lastPageCount = -1;
                     // 自动阅读模式
                     while (isAutoRead && !exit)
                     {
                         if (!paused)
                         {
-
-                            if (isFirstRead == false)
-                            {
-                                bookService.NextLine();
-                                if (book.CurrentReadChapterLine == 0)
-                                {
-                                    isFirstRead = true;
-                                    autoReadLineIndex = 0;
-                                }
-                            }
-
                             string[] pageContent = bookService.GetCurrentPage();
                             if (pageContent == null || pageContent.Length == 0)
                             {
                                 continue;
                             }
+
+                            if (pageContent.Length != lastPageCount)
+                            {
+                                if (pageContent.Length % 2 == 0)
+                                {
+                                    bookService.NextLine();
+                                    pageContent = bookService.GetCurrentPage();
+                                }
+                            }
+                            lastPageCount = pageContent.Length;
 
                             int midIndex = pageContent.Length / 2;
 
@@ -560,10 +560,20 @@ namespace Moyu.UI
                                 if (autoReadLineIndex >= midIndex)
                                 {
                                     isFirstRead = false;
+                                    bookService.NextLine();
                                 }
                                 else
                                 {
                                     autoReadLineIndex++;
+                                }
+                            }
+                            else
+                            {
+                                bookService.NextLine();
+                                if (book.CurrentReadChapterLine == 0)
+                                {
+                                    isFirstRead = true;
+                                    autoReadLineIndex = 0;
                                 }
                             }
 
