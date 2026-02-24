@@ -25,10 +25,6 @@ namespace Moyu.Models
         /// </summary>
         public BookFormatEnum Format { get; set; } = BookFormatEnum.Txt;
         /// <summary>
-        /// 书签位置
-        /// </summary>
-        public int MarkLoc { get; set; } = 0;
-        /// <summary>
         /// 书签进度
         /// </summary>
         public float MarkProgress { get; set; } = 0f;
@@ -41,9 +37,9 @@ namespace Moyu.Models
         /// </summary>
         public int CurrentChapterIndex { get; set; } = 0;
         /// <summary>
-        /// 当前阅读到章节行数
+        /// 当前阅读的原始行位置（对于 Txt 格式，精确到行；对于 Epub 格式，表示章节内行位置）
         /// </summary>
-        public int CurrentReadChapterLine { get; set; }
+        public int CurrentReadOriginalLine { get; set; }
 
     }
 }

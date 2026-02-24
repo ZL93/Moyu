@@ -38,6 +38,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Speech" />
     <Reference Include="System.Web" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -55,16 +56,18 @@
     <Compile Include="Models\Bqg\BqgChapterListResponse.cs" />
     <Compile Include="Models\Bqg\BqgChapter.cs" />
     <Compile Include="Models\Bqg\BqgNovel.cs" />
+    <Compile Include="Models\ReadModeEnum.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Models\BookInfo.cs" />
     <Compile Include="Models\ChapterInfo.cs" />
-    <Compile Include="Services\BaseBookService.cs" />
     <Compile Include="Services\BookServiceFactory.cs" />
+    <Compile Include="Services\ChapterBasedBookService.cs" />
     <Compile Include="Services\EpubBookService.cs" />
     <Compile Include="Services\IBookService.cs" />
     <Compile Include="Services\BqgBookService.cs" />
-    <Compile Include="Services\Interface1.cs" />
+    <Compile Include="Services\IBookSearch.cs" />
     <Compile Include="Services\TxtBookService.cs" />
+    <Compile Include="Services\WholeBookService.cs" />
     <Compile Include="UI\ConsoleUI.cs" />
     <Compile Include="Utils\ConsoleHelper.cs" />
     <Compile Include="Utils\MathEx.cs" />

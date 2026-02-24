@@ -84,5 +84,7 @@ namespace Moyu.Services
         /// 异步下一行
         /// </summary>
         Task NextLineAsync();
+        string GetCurrentSentence();
+        (int startLine, int endLine) GetCurrentHighlightRange();
     }
 }

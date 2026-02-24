@@ -4,7 +4,7 @@ using System;
 namespace Moyu.Services
 {
     /// <summary>
-    /// 书籍服务工厂，负责创建合适的服务实例
+    /// 书籍服务工厂
     /// </summary>
     public static class BookServiceFactory
     {
@@ -42,7 +42,7 @@ namespace Moyu.Services
                 case BookFormatEnum.Txt:
                     return new TxtBookService();
                 case BookFormatEnum.Epub:
-                   return new EpubBookService();
+                    return new EpubBookService();
                 case BookFormatEnum.Online:
                     return new BqgBookService();
                 default:

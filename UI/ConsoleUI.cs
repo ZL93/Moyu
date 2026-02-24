@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Speech.Synthesis;
 using System.Text;
 using System.Threading;
 
@@ -17,6 +18,9 @@ namespace Moyu.UI
         private IBookService bookService = new TxtBookService();
         private IBookSearch bookSearch = new BqgBookService();
         private bool bossKeyDown = false;
+        private SpeechSynthesizer ttsPlayer = new SpeechSynthesizer();
+        private string SelectVoice = "Microsoft Xiaoxiao";
+        private bool isSpeaking = false;
         public void Run()
         {
             Console.CursorVisible = false;
@@ -26,6 +30,23 @@ namespace Moyu.UI
 
             Config.Instance.LoadConfig();
             Config.Instance.bookInfos = Config.Instance.bookInfos.OrderByDescending(b => b.LastReadTime).ToList();
+
+            ttsPlayer.Volume = 100;  // 设置音量（0-100）
+            ttsPlayer.SpeakCompleted += (s, e) =>
+            {
+                if (e.Prompt.IsCompleted)
+                {
+                    isSpeaking = false;
+                }
+            };
+            foreach (InstalledVoice voice in ttsPlayer.GetInstalledVoices())
+            {
+                //Console.WriteLine(voice.VoiceInfo.Name);
+                if (voice.VoiceInfo.Name == SelectVoice)
+                {
+                    ttsPlayer.SelectVoice(SelectVoice);
+                }
+            }
 
             int globalIndex = 0;
             int pageSize = 10;
@@ -40,6 +61,7 @@ namespace Moyu.UI
                 {
                     pageSize = Console.WindowHeight - 3;
                 }
+                pageSize = Math.Max(pageSize, 1);
                 var booksList = Config.Instance.bookInfos;
                 int booksCount = booksList.Count; //总书籍数量
                 int currentPage = globalIndex / pageSize; // 计算当前页的索引
@@ -98,7 +120,7 @@ namespace Moyu.UI
                         AddBook();
                         break;
                     case ConsoleKey.F:
-                        SerachBook();
+                        SearchBook();
                         break;
                     case ConsoleKey.Delete:
                         Console.Clear();
@@ -218,7 +240,7 @@ namespace Moyu.UI
             }
         }
 
-        private void SerachBook()
+        private void SearchBook()
         {
             Console.Clear();
             Console.Write("\n请输入小说名称：");
@@ -439,14 +461,13 @@ namespace Moyu.UI
             bookService.LoadBook(book);
 
             bool exit = false;
-            bool isAutoRead = false;
+            //bool isAutoRead = false;
+            ReadModeEnum readMode =  ReadModeEnum.Normal;
             bool paused = false;
-            bool isFirstRead = true;
-            int autoReadLineIndex = 0;
-
+          
             while (!exit)
             {
-                if (!isAutoRead)
+                if (readMode == ReadModeEnum.Normal)
                 {
                     // 普通阅读模式
                     Console.Clear();
@@ -463,7 +484,7 @@ namespace Moyu.UI
                         {
                             Console.WriteLine("\n操作说明：");
                             Console.WriteLine(" ←/A 上一页    →/D 下一页    T 选择章节");
-                            Console.WriteLine(" 空格自动阅读");
+                            Console.WriteLine(" 空格自动阅读  R键自动朗读");
                         }
                     }
                     var key = Console.ReadKey(true);
@@ -482,25 +503,24 @@ namespace Moyu.UI
                     {
                         case ConsoleKey.RightArrow:
                         case ConsoleKey.D:
-                            autoReadLineIndex = 0;
-                            isFirstRead = true;
                             bookService.NextPage();
                             Config.Instance.SaveConfig();
                             break;
                         case ConsoleKey.LeftArrow:
                         case ConsoleKey.A:
-                            autoReadLineIndex = 0;
-                            isFirstRead = true;
                             bookService.PrevPage();
                             Config.Instance.SaveConfig();
                             break;
                         case ConsoleKey.T:
-                            autoReadLineIndex = 0;
-                            isFirstRead = true;
                             ShowChapters(book);
                             break;
                         case ConsoleKey.Spacebar:
-                            isAutoRead = true;
+                            readMode = ReadModeEnum.AutoFocus;
+                            paused = false;
+                            Thread.Sleep(300);
+                            break;
+                        case ConsoleKey.R:
+                            readMode = ReadModeEnum.ReadAloud;
                             paused = false;
                             Thread.Sleep(300);
                             break;
@@ -511,74 +531,35 @@ namespace Moyu.UI
                             break;
                     }
                 }
-                else
+                else if (readMode == ReadModeEnum.AutoFocus)
                 {
+                    // 自动换行模式
                     int lineDelay = 300;
-                    int charCount = 10;
                     int charDelay = Config.Instance.AutoReadDelay > 0 ? Config.Instance.AutoReadDelay : 50;
-                    int lastPageCount = -1;
-                    // 自动阅读模式
-                    while (isAutoRead && !exit)
+                    bool isFirst = true;
+                    while (readMode == ReadModeEnum.AutoFocus && !exit)
                     {
                         if (!paused)
                         {
-                            string[] pageContent = bookService.GetCurrentPage();
-                            if (pageContent == null || pageContent.Length == 0)
+                            if (isFirst)
                             {
-                                continue;
-                            }
-
-                            if (pageContent.Length != lastPageCount)
-                            {
-                                if (pageContent.Length % 2 == 0)
-                                {
-                                    bookService.NextLine();
-                                    pageContent = bookService.GetCurrentPage();
-                                }
-                            }
-                            lastPageCount = pageContent.Length;
-
-                            int midIndex = pageContent.Length / 2;
-
-                            if (isFirstRead)
-                            {
-                                autoReadLineIndex = Math.Min(autoReadLineIndex, pageContent.Length - 1);
-                            }
-                            else
-                            {
-                                autoReadLineIndex = midIndex;
-                            }
-
-                            PrintPage(pageContent, autoReadLineIndex);
-
-                            // 设置延时
-                            charCount = pageContent[autoReadLineIndex]?.Length ?? 0;
-                            lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
-
-                            if (isFirstRead)
-                            {
-                                if (autoReadLineIndex >= midIndex)
-                                {
-                                    isFirstRead = false;
-                                    bookService.NextLine();
-                                }
-                                else
-                                {
-                                    autoReadLineIndex++;
-                                }
+                                isFirst = false;
                             }
                             else
                             {
                                 bookService.NextLine();
-                                if (book.CurrentReadChapterLine == 0)
-                                {
-                                    isFirstRead = true;
-                                    autoReadLineIndex = 0;
-                                }
                             }
+                            string[] pageContent = bookService.GetCurrentPage();
+                            var (highlightStart, highlightEnd) = bookService.GetCurrentHighlightRange();
+                            string sentence = bookService.GetCurrentSentence();
 
+                            PrintPageWithHighlight(pageContent, highlightStart, highlightEnd);
+
+                            string highlightStr = string.Concat(pageContent.Skip(highlightStart).Take(highlightEnd - highlightStart + 1));
+                            // 设置延时
+                            var charCount = highlightStr?.Length ?? 0;
+                            lineDelay = MathEx.Clamp(charCount * charDelay, 100, 5000);
                         }
-
                         int sleepCount = lineDelay / 50;
                         for (int i = 0; i < sleepCount; i++)
                         {
@@ -595,9 +576,15 @@ namespace Moyu.UI
                                     }
                                     break;
                                 }
+                                else if (key.Key == ConsoleKey.R)
+                                {
+                                    readMode = ReadModeEnum.ReadAloud;
+                                    break;
+                                }
                                 else if (key.Key == ConsoleKey.Spacebar)
                                 {
-                                    isAutoRead = false;
+                                    readMode = ReadModeEnum.Normal;
+                                    isFirst = true;
                                     break;
                                 }
                                 else if (key.Key == ConsoleKey.Add || key.Key == ConsoleKey.OemPlus)
@@ -612,7 +599,8 @@ namespace Moyu.UI
                                 }
                                 else if (key.Key == ConsoleKey.Escape)
                                 {
-                                    isAutoRead = false;
+                                    readMode = ReadModeEnum.Normal;
+                                    isFirst = true;
                                     exit = true;
                                     break;
                                 }
@@ -621,25 +609,117 @@ namespace Moyu.UI
                         }
                     }
                     Config.Instance.SaveConfig();
+
+                }
+                else if (readMode == ReadModeEnum.ReadAloud)
+                {
+                    // 听书模式
+                    bool isFirst = true;
+                    while (readMode == ReadModeEnum.ReadAloud && !exit)
+                    {
+                        if (!paused)
+                        {
+                            if (isFirst)
+                            {
+                                isFirst = false;
+                            }
+                            else
+                            {
+                                bookService.NextLine();
+                            }
+                            string[] pageContent = bookService.GetCurrentPage();
+                            var (highlightStart, highlightEnd) = bookService.GetCurrentHighlightRange();
+                            string sentence = bookService.GetCurrentSentence();
+
+                            PrintPageWithHighlight(pageContent, highlightStart, highlightEnd);
+                          
+                            if (!string.IsNullOrWhiteSpace(sentence))
+                            {
+                                isSpeaking = true;
+                                ttsPlayer.SpeakAsync(sentence);
+                            }
+                        }
+                        do
+                        {
+                            if (Console.KeyAvailable)
+                            {
+                                var key = Console.ReadKey(true);
+                                if (key.KeyChar == BOSSKEY1 || key.KeyChar == BOSSKEY2)
+                                {
+                                    paused = bossKeyDown = !bossKeyDown;
+                                    if (bossKeyDown)
+                                    {
+                                        Console.Clear();
+                                        Console.WriteLine("正在更新中，请稍候...");
+                                        ttsPlayer.SpeakAsyncCancelAll();
+                                        isFirst = true;
+                                    }
+                                    break;
+                                }
+                                else if (key.Key == ConsoleKey.R)
+                                {
+                                    readMode = ReadModeEnum.AutoFocus;
+                                    ttsPlayer.SpeakAsyncCancelAll();
+                                    break;
+                                }
+                                else if (key.Key == ConsoleKey.Spacebar)
+                                {
+                                    readMode = ReadModeEnum.Normal;
+                                    ttsPlayer.SpeakAsyncCancelAll();
+                                    isFirst = true;
+                                    break;
+                                }
+                                else if (key.Key == ConsoleKey.Add || key.Key == ConsoleKey.OemPlus)
+                                {
+                                    ttsPlayer.Rate++;
+                                }
+                                else if (key.Key == ConsoleKey.Subtract || key.Key == ConsoleKey.OemMinus)
+                                {
+                                    ttsPlayer.Rate--;
+                                }
+                                else if (key.Key == ConsoleKey.Escape)
+                                {
+                                    readMode = ReadModeEnum.Normal;
+                                    exit = true;
+                                    ttsPlayer.SpeakAsyncCancelAll();
+                                    isFirst = true;
+                                    break;
+                                }
+                            }
+                            Thread.Sleep(10);
+                        } while (isSpeaking);
+                    }
+                    Config.Instance.SaveConfig();
                 }
             }
         }
-        // 封装高亮打印页面内容
-        private void PrintPage(string[] lines, int highlightIndex)
+        /// <summary>
+        /// 带多行高亮的页面渲染
+        /// </summary>
+        private void PrintPageWithHighlight(string[] lines, int highlightStart, int highlightEnd)
         {
             Console.Clear();
+
             for (int i = 0; i < lines.Length; i++)
             {
-                Console.ForegroundColor = i == highlightIndex ? ConsoleColor.Gray : ConsoleColor.DarkGray;
+                if (i >= highlightStart && i <= highlightEnd)
+                {
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                }
                 Console.WriteLine(lines[i]);
             }
-
             if (Config.Instance.ShowHelpInfo)
             {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.WriteLine("\n操作说明：");
                 Console.WriteLine(" 空格退出自动阅读  +/- 调节速度");
             }
         }
+       
         private void ShowChapters(BookInfo book)
         {
             int chapterCount = bookService.GetChaptersCount();
