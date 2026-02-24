@@ -43,18 +43,12 @@ Moyu 是一个基于 C# (.NET Framework 4.8) 的本地小说阅读器，支持 T
 - `H`：开启/关闭操作说明
 - `T`：阅读时选择章节
 - `空格`：阅读时切换自动阅读模式（再次空格退出自动阅读）
+- `R`：阅读时切换自动朗读模式
 - `+/-`：自动阅读时调节速度
 - `ESC`：返回或退出
 - `·` 或 `` ` ``：Boss 键隐藏界面
 
-## 目录结构
 
-- `Program.cs`：主程序入口
-- `UI/ConsoleUI.cs`：控制台界面与交互逻辑
-- `Services/BookService.cs`、`Services/TxtBookService.cs`、`Services/EpubBookService.cs`：书籍管理与格式适配
-- `Models/BookInfo.cs`、`Models/ChapterInfo.cs`、`Models/BookFormatEnum.cs`：数据模型
-- `Utils/ConsoleHelper.cs`、`Utils/TextFileReader.cs`、`Utils/SysEnvironment.cs`：工具类
-- `Config.cs`：配置管理
 
 ## 进阶说明
 
